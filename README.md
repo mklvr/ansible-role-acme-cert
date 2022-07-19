@@ -1,7 +1,7 @@
 ansible-role-acme-cert
 =========
 
-Provision a certification with ACME.
+Provision a certificate with ACME.
 
 Requirements
 ------------
@@ -11,7 +11,7 @@ Nothing special.
 Role Variables
 --------------
 
-I tried to not require an variables and just have sensible defaults. YYMV.
+I tried to not require any variables and just have sensible defaults. YMMV.
 
 Dependencies
 ------------
