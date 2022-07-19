@@ -1,0 +1,21 @@
+---
+- name: Install the web server
+  ansible.builtin.apt:
+    name:
+      - apache2
+    state: present
+
+- name: Create the acme challenge directories
+  ansible.builtin.file:
+    dest: /var/www/html/.well-known/acme-challenge
+    state: directory
+    recurse: True
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Create the acme challenge
+  ansible.builtin.copy:
+    dest: "/var/www/html/{{ hostname_challenge['challenge_data'][ansible_fqdn]['http-01']['resource'] }}"
+    content: "{{ hostname_challenge['challenge_data'][ansible_fqdn]['http-01']['resource_value'] }}"
+  when: hostname_challenge is changed and ansible_fqdn in hostname_challenge['challenge_data']
