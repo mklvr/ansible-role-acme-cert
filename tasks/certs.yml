@@ -1,0 +1,65 @@
+---
+- name: Generate a account key for our server
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  community.crypto.openssl_privatekey:
+    path: "/etc/ssl/private/{{ ansible_fqdn }}-account.pem"
+  register: openssl_account_private_key
+
+- name: Generate a private key for our server
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  community.crypto.openssl_privatekey:
+    path: "/etc/ssl/private/{{ ansible_fqdn }}.pem"
+  register: openssl_private_key
+
+- name: Generate an OpenSSL Certificate Signing Request
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  community.crypto.openssl_csr:
+    path: "/etc/ssl/certs/{{ ansible_fqdn }}.csr"
+    privatekey_path: "{{ openssl_private_key['filename'] }}"
+    common_name: "{{ ansible_fqdn }}"
+    country_name: US
+    locality_name: Fresno, CA
+    email_address: "noc@{{ ansible_fqdn }}"
+  register: openssl_csr
+
+- name: Make sure account exists and has given contacts. We agree to TOS.
+  community.crypto.acme_account:
+    acme_version: 2
+    acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    account_key_src: "{{ openssl_account_private_key['filename'] }}"
+    state: present
+    terms_agreed: yes
+    contact:
+      - "mailto:noc@{{ ansible_fqdn }}"
+
+- name: "Create a challenge for {{ ansible_fqdn }} using a account key from a variable."
+  vars:
+    ansible_python_interpreter: /usr/bin/python
+  community.crypto.acme_certificate:
+    acme_version: 2
+    acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    remaining_days: 10
+    terms_agreed: True
+    account_key_src: "{{ openssl_account_private_key['filename'] }}"
+    csr: "{{ openssl_csr['filename'] }}"
+    fullchain_dest: "/etc/ssl/certs/{{ ansible_fqdn }}.crt"
+  register: hostname_challenge
+
+- include_tasks: webserver.yml
+
+- name: Let the challenge be validated and retrieve the cert and intermediate certificate
+  community.crypto.acme_certificate:
+    account_email: "noc@{{ ansible_fqdn }}"
+    account_key_src: "{{ openssl_account_private_key['filename'] }}"
+    acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    acme_version: 2
+    challenge: http-01
+    src: "{{ openssl_csr['filename'] }}"
+    data: "{{ hostname_challenge }}"
+    fullchain_dest: "/etc/ssl/certs/{{ ansible_fqdn }}.crt"
+    remaining_days: 10
+    terms_agreed: True
+  when: hostname_challenge is changed
